@@ -12,13 +12,6 @@
 
 ---
 
-## 开发环境
-
-| 项目 | 说明 |
-|------|------|
-| 主机 | Windows |
-| 开发环境 | CNB 云原生开发环境 |
-| AI 搭子 | Cursor / VS Code Remote |
 
 ### 云原生配置
 
@@ -467,4 +460,3 @@ static void test_mydevice(void)
 - [QEMU 官方文档](https://www.qemu.org/docs/master/)
 - [QEMU 源代码](https://github.com/qemu/qemu)
 - [RISC-V 规范](https://riscv.org/technical/specifications/)
-- HPC Wiki - [CUDA 编程入门](https://hpcwiki.io/gpu/cuda/)
