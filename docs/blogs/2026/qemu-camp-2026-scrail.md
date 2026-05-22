@@ -10,19 +10,19 @@
 
 ## 专业阶段
 
-完成CPU实验和GPGPU实验的基础部分，之后会尝试完成GPU的进阶实验。
+完成 CPU 实验和 GPGPU 实验的基础部分，之后会尝试完成 GPU 的进阶实验。
 
-### CPU实验
-本实验从完成的角度而言并不困难，只需要理解TCG是如何从客户机指令转化为目标机指令的过程：
-- RISCV架构的ISA定义与指令添加：这部分已经由decodetree提供了相当便利的译码设施，只需要按照指令集编码格式注册新的指令，相应的译码函数与翻译函数就会被自动添加进TCG翻译过程。
-- ISA转换为TCG IR：对应到翻译函数——也就是trans_XXX的具体实现，是本任务的核心，在基础实验中只需要编写C helper函数，使用工具宏注册后再trans函数中调用gen_helper即可。
-- TCG IR经过优化后变为二进制BB:这是最终的执行过程，从基础实验的角度不需要太过深入，不过这里也一并参考源码进行一些分析。
+### CPU 实验
+本实验从完成的角度而言并不困难，只需要理解 TCG 是如何从客户机指令转化为目标机指令的过程：
+- RISCV 架构的 ISA 定义与指令添加：这部分已经由 decodetree 提供了相当便利的译码设施，只需要按照指令集编码格式注册新的指令，相应的译码函数与翻译函数就会被自动添加进 TCG 翻译过程。
+- ISA 转换为 TCG IR：对应到翻译函数——也就是 trans_XXX 的具体实现，是本任务的核心，在基础实验中只需要编写 C helper 函数，使用工具宏注册后再 trans 函数中调用 gen_helper 即可。
+- TCG IR 经过优化后变为二进制 BB:这是最终的执行过程，从基础实验的角度不需要太过深入，不过这里也一并参考源码进行一些分析。
 
-在完成任务的过程中，在AI的辅助下，我对QEMU TCG的整体代码进行了分析，下边对学习到的内容进行梳理。
+在完成任务的过程中，在 AI 的辅助下，我对 QEMU TCG 的整体代码进行了分析，下边对学习到的内容进行梳理。
 
 #### 译码
 
-> 客户机指令 -> trans_XXX()函数
+> 客户机指令 -> trans_XXX() 函数
 
 译码是架构特定的，因此相关内容实现在`target/riscv/`下，主要是`translate.c`。
 
@@ -35,7 +35,7 @@
 - `riscv_tr_ops.translate_insn`字段指向`riscv_tr_translate_insn`
 - `riscv_tr_translate_insn`调用`decode_opc`，这是译码的核心执行逻辑
 
-至于调用过程发生在`translator_loop()`中，这里也是TB prologue和 epilogue被添加进IR的地方。
+至于调用过程发生在`translator_loop()`中，这里也是 TB prologue 和 epilogue 被添加进 IR 的地方。
 
 ```c
 void translator_loop(CPUState *cpu, TranslationBlock *tb, ...)
@@ -56,7 +56,7 @@ void translator_loop(CPUState *cpu, TranslationBlock *tb, ...)
 
         // TB 终止判断
         // - 发生跳转
-        // - op缓冲区满
+        // - op 缓冲区满
         // - 达到指令上限
         if (db->is_jmp != DISAS_NEXT) { break; }    
         if (tcg_op_buf_full() || db->num_insns >= db->max_insns) {
@@ -71,8 +71,8 @@ void translator_loop(CPUState *cpu, TranslationBlock *tb, ...)
 }
 ```
 
-decode_opc处理取指和译码两部分：
-- 取指：从当前PC加载32位操作码`translator_ldl_end`，包含压缩指令与跨页分支逻辑
+decode_opc 处理取指和译码两部分：
+- 取指：从当前 PC 加载 32 位操作码`translator_ldl_end`，包含压缩指令与跨页分支逻辑
 - 译码：从`ctx->decoders`指针表调用正确的译码函数。
 
 ```c
@@ -91,7 +91,7 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx)
 }
 ```
 
-全量`decoder_table`定义在`translate.c:1235`，每个译码函数都配备了guard函数，因为在实际场景下并不会将此数组全部注册上。
+全量`decoder_table`定义在`translate.c:1235`，每个译码函数都配备了 guard 函数，因为在实际场景下并不会将此数组全部注册上。
 ```c
 const RISCVDecoder decoder_table[] = {
     { always_true_p, decode_insn32 },
@@ -116,7 +116,7 @@ void riscv_tcg_cpu_finalize_dynamic_decoder(RISCVCPU *cpu)
     cpu->decoders = dynamic_decoders;
 }
 ```
-具体的译码过程，以`decode_insn32`为例，是`decodetree`工具从`target/riscv/insn32.decode`自动生成的模式匹配函数。它将opcode的bit字段与预定义的指令模式进行比对，匹配成功后调用对应的`trans_XXX()`函数。函数内容在自动生成的`decode-insn32.c.inc`中。
+具体的译码过程，以`decode_insn32`为例，是`decodetree`工具从`target/riscv/insn32.decode`自动生成的模式匹配函数。它将 opcode 的 bit 字段与预定义的指令模式进行比对，匹配成功后调用对应的`trans_XXX()`函数。函数内容在自动生成的`decode-insn32.c.inc`中。
 
 ```c
 static bool decode_insn32(DisasContext *ctx, uint32_t insn)
@@ -172,18 +172,18 @@ static bool decode_insn32(DisasContext *ctx, uint32_t insn)
     }
 }
 ```
-#### TCG IR生成
+#### TCG IR 生成
 
 > trans_XXX() -> TCG IR
 
-正如讲义中所说，trans_XXX()函数是为了生成TCG IR，QEMU中每条IR指令对应一个`TCGOp`节点，全部链接在`TCGContext->ops`双向链表中。
+正如讲义中所说，trans_XXX() 函数是为了生成 TCG IR，QEMU 中每条 IR 指令对应一个`TCGOp`节点，全部链接在`TCGContext->ops`双向链表中。
 ```c
 // include/tcg/tcg.h:310
 struct TCGOp {
-    TCGOpcode opc   : 8;    // 操作码INDEX_op_XXX
+    TCGOpcode opc   : 8;    // 操作码 INDEX_op_XXX
     unsigned nargs  : 8;    // 参数个数
     unsigned param1 : 8;    // 灵活语义字段，下方通过宏定义包裹不同语义
-    unsigned param2 : 8;    // 多数指令中1表示操作数类型，2表示操作标志位
+    unsigned param2 : 8;    // 多数指令中 1 表示操作数类型，2 表示操作标志位
     
     TCGLifeData life;       // 生命周期数据（优化过程使用）
 
@@ -205,7 +205,7 @@ trans_add()
           → tcg_gen_op3(INDEX_op_add, arg0, arg1, arg2)    // tcg/tcg.c
             → tcg_emit_op(opc, 3, args)
 ```
-`tcg_emit_op()`分配`TCGOp`节点（包括操作数`TCGArg`的空间），设置opc，然后添加到ctx链表上。`tcg_gen_op3()`负责设置操作数类型和操作数。
+`tcg_emit_op()`分配`TCGOp`节点（包括操作数`TCGArg`的空间），设置 opc，然后添加到 ctx 链表上。`tcg_gen_op3()`负责设置操作数类型和操作数。
 ```c
 TCGOp *tcg_emit_op(TCGOpcode opc, unsigned nargs)
 {
@@ -231,18 +231,18 @@ TCGOp * NI tcg_gen_op3(TCGOpcode opc, TCGType type, TCGArg a1,
 }
 ```
 
-这里也是完成实验需要编写功能代码的位置，我们需要在自定义指令的trans函数中实现指令功能，不过考虑到大部分指令都涉及到向量运算，在不使用`tcg_gen_gvec`的情况下用IR的方式实现时，就像是用汇编写复杂的循环逻辑，并不方便开发，代码也很难理解，因此还是推荐使用Helper的方式。
+这里也是完成实验需要编写功能代码的位置，我们需要在自定义指令的 trans 函数中实现指令功能，不过考虑到大部分指令都涉及到向量运算，在不使用`tcg_gen_gvec`的情况下用 IR 的方式实现时，就像是用汇编写复杂的循环逻辑，并不方便开发，代码也很难理解，因此还是推荐使用 Helper 的方式。
 
-在讲义里已经通过`cube`的例子告诉我们通过helper实现一个函数只需要三个步骤：
+在讲义里已经通过`cube`的例子告诉我们通过 helper 实现一个函数只需要三个步骤：
 1. `DEF_HELPER`宏注册帮助函数
 2. 编写`helper_XXX`函数
 3. 在`trans_XXX`函数中调用`gen_helper_XXX`函数
 
 看起来很简单？但是我当时对这个流程产生了一些困扰，比如`DEF_HELPER`宏具体做了什么？为什么它看起来存在三个不同的展开？比如`gen_helper`是什么时候定义的？为什么是`gen_helper`而不是`helper`？
 
-由于Helper生成IR的额外复杂性，这里聚焦实现某个特定指令走一下整个流程。
+由于 Helper 生成 IR 的额外复杂性，这里聚焦实现某个特定指令走一下整个流程。
 
-##### HELPER注册
+##### HELPER 注册
 在`target/riscv/helper.h`中使用`DEF_HELPER`宏注册对应函数，这也是讲义中的内容。但我们需要找到它的展开形式
 ```c
 DEF_HELPER_4(dma, void, env, tl, tl, tl)
@@ -282,9 +282,9 @@ static inline void glue(gen_helper_, name)(dh_retvar_decl(ret)          \
 }
 ```
 
-同一个用于描述Helper函数的宏，被分别展开为三种不同的东西，第一个用于生成供QEMU使用的元数据`TCGHelperInfo`、第二个用于定义Helper函数本身的函数原型、第三个则是定义`gen_helper`，用于添加IR指令。
+同一个用于描述 Helper 函数的宏，被分别展开为三种不同的东西，第一个用于生成供 QEMU 使用的元数据`TCGHelperInfo`、第二个用于定义 Helper 函数本身的函数原型、第三个则是定义`gen_helper`，用于添加 IR 指令。
 
-对于dma指令而言，会展开成如下三个东西
+对于 dma 指令而言，会展开成如下三个东西
 
 **`HelperInfo`**
 ```c
@@ -299,7 +299,7 @@ TCGHelperInfo helper_info_dma = {
         | dh_typemask(tl,4)        // dh_typecode_i64  << 12 = 4 << 12  
 }; 
 ```
-`typecode`通过宏定义在`include/exec/helper-head.h.inc`，总共六种，一个类型占3b，编码在typemask中。
+`typecode`通过宏定义在`include/exec/helper-head.h.inc`，总共六种，一个类型占 3b，编码在 typemask 中。
 
 **`HelperProto`**
 ```c
@@ -325,7 +325,7 @@ static inline void gen_helper_dma(TCGv_ptr arg1, TCGv_i64 arg2,
 
 #### TCG IR 优化
 
-优化过程在生成二进制的`tcg_gen_code()`函数内，在代码生成前执行一系列优化pass。
+优化过程在生成二进制的`tcg_gen_code()`函数内，在代码生成前执行一系列优化 pass。
 
 ```c
 int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
@@ -353,8 +353,8 @@ int tcg_gen_code(TCGContext *s, TranslationBlock *tb, uint64_t pc_start)
 }
 ```
 
-不过在说明优化前，需要对TCG的TCGTemp寄存器进行说明，在之前流程中的`TCGv`、`TCGArg`是`TCGTemp`的不同表示
-- `TCGv`: 结构体相对于ctx的偏移量（注意并非ctx.temps中的下标，这是为了保留0作为NULL的语义）
+不过在说明优化前，需要对 TCG 的 TCGTemp 寄存器进行说明，在之前流程中的`TCGv`、`TCGArg`是`TCGTemp`的不同表示
+- `TCGv`: 结构体相对于 ctx 的偏移量（注意并非 ctx.temps 中的下标，这是为了保留 0 作为 NULL 的语义）
 - `TCGArg`: 结构体的地址
 - `TCGTemp`: 实际结构体
 ```c
@@ -386,17 +386,17 @@ typedef struct TCGTemp {
 
 在优化阶段，只需要关注
 - `kind`: 临时寄存器活性边界
-- `val_type`: 值位置CONST/REG/MEM
+- `val_type`: 值位置 CONST/REG/MEM
 - `type`: 数据位宽
 - `mem_base`: 间接依赖
 - `mem_offset`: 间接依赖
 - `indirect_reg`: 间接依赖，触发判断
 - `state`: TS_DEAD TS_MEM 
-- `state_ptr`: 多语义字段,pass1 `TempOptInfo`;pass3 EBB指针; pass4 TCGRegSet偏好; pass5 直接temp映射
+- `state_ptr`: 多语义字段，pass1 `TempOptInfo`;pass3 EBB 指针; pass4 TCGRegSet 偏好; pass5 直接 temp 映射
 
 ##### `tcg_optimize`
-此pass流程为正向遍历IR，处理复制传播，并根据指令码派发到不同的处理函数进行常量折叠。
-- 复制传播：检查当前操作数的复制链，按照优先级依次寻找先前定义的常量、全局变量、TB内变量、EBB内变量，并修正Op的arg字段指向。
+此 pass 流程为正向遍历 IR，处理复制传播，并根据指令码派发到不同的处理函数进行常量折叠。
+- 复制传播：检查当前操作数的复制链，按照优先级依次寻找先前定义的常量、全局变量、TB 内变量、EBB 内变量，并修正 Op 的 arg 字段指向。
 - 常量折叠：当操作数均为常量时，直接预计算结果提供下游指令使用
 ```
 foreach op in s->ops (正向遍历):
@@ -413,7 +413,7 @@ foreach op in s->ops (正向遍历):
 
 ##### `reachable_code_pass`
 
-此pass负责死代码消除，在这个pass中会根据标签和跳转指令删除所有冗余或不可达的代码段，主要有以下四种形式：
+此 pass 负责死代码消除，在这个 pass 中会根据标签和跳转指令删除所有冗余或不可达的代码段，主要有以下四种形式：
 - 无条件跳转后的不可达代码
 - 冗余标签
 - 优化产生的空跳转
@@ -442,9 +442,9 @@ add x7, x7, 1           // 和之后的代码
 
 ##### 活性分析
 
-活性分析的这几个pass主要是为了更细致的标注寄存器生命周期，为生成代码时更好的分配寄存器提供信息。
-- `liveness_pass_0`: 临时寄存器生命周期缩减。扫描生命周期定义在整个TB上的`TEMP_TB`，如果它们只在单个EBB内使用，则降级为`TEMP_EBB`，以便提前回收可用的寄存器资源。
-- `liveness_pass_1`：反向遍历TB，对每个使用到的临时寄存器，分析其是否存活，如果不再有用则可以释放。
+活性分析的这几个 pass 主要是为了更细致的标注寄存器生命周期，为生成代码时更好的分配寄存器提供信息。
+- `liveness_pass_0`: 临时寄存器生命周期缩减。扫描生命周期定义在整个 TB 上的`TEMP_TB`，如果它们只在单个 EBB 内使用，则降级为`TEMP_EBB`，以便提前回收可用的寄存器资源。
+- `liveness_pass_1`：反向遍历 TB，对每个使用到的临时寄存器，分析其是否存活，如果不再有用则可以释放。
 - `liveness_pass_2`：间接临时寄存器，间接访存，显式展开为`ld/st`操作。
 
 其中`liveness_pass_1`，尽管其逻辑可以简单的总结为以下处理方式，但是对于特殊情况需要细致的判断，比如特定架构中进位`carry`是隐含状态、分支跳转、函数调用会导致寄存器使用的一致性被破坏因而需要存入内存等等。这里不过多深入。
@@ -461,7 +461,7 @@ add x7, x7, 1           // 和之后的代码
 
 #### 代码生成
 
-目标代码同样是架构特定的，QEMU在这里使用了基于函数指针表的分派架构，每个操作码对应一个TCGOutOp*结构，包含指向特定变体的函数指针：
+目标代码同样是架构特定的，QEMU 在这里使用了基于函数指针表的分派架构，每个操作码对应一个 TCGOutOp*结构，包含指向特定变体的函数指针：
 ```c
 // tcg/tcg.c:1159
 static const TCGOutOp * const all_outop[NB_OPS] = {
@@ -476,7 +476,7 @@ static const TCGOutOp * const all_outop[NB_OPS] = {
 ```c
 // tcg/x86_64/tcg-target.c.inc:2408
 static const TCGOutOpBinary outop_add = {
-    .base.static_constraint = C_O1_I2(r, r, re),  // 输出: 寄存器, 输入: 寄存器, 寄存器/常量
+    .base.static_constraint = C_O1_I2(r, r, re),  // 输出：寄存器，输入：寄存器，寄存器/常量
     .out_rrr = tgen_add,    // reg + reg
     .out_rri = tgen_addi,   // reg + imm
 };
@@ -484,17 +484,17 @@ static const TCGOutOpBinary outop_add = {
 
 ---
 
-### GPU实验
+### GPU 实验
 
-GPGPU实验的基础部分的目标是在QEMU中实现一个简单的GPGPU设备，核心工作包含两个部分：
-- 设备建模：实现符合PCI规范的GPU设备，提供MMIO寄存器接口
-- 内核模拟：实现一个RISCV SIMT解释器，支持完整的内核执行功能，这里参照NEMU实现。
+GPGPU 实验的基础部分的目标是在 QEMU 中实现一个简单的 GPGPU 设备，核心工作包含两个部分：
+- 设备建模：实现符合 PCI 规范的 GPU 设备，提供 MMIO 寄存器接口
+- 内核模拟：实现一个 RISCV SIMT 解释器，支持完整的内核执行功能，这里参照 NEMU 实现。
 
-设备模拟部分相对而言不算复杂，反而是内核模拟部分为了读懂NEMU花了不少功夫，感觉又学了一遍怎么写译码（）
+设备模拟部分相对而言不算复杂，反而是内核模拟部分为了读懂 NEMU 花了不少功夫，感觉又学了一遍怎么写译码（）
 
-#### GPU设备
+#### GPU 设备
 
-实验提供的代码已经将设备注册、初始化等代码完成，向设备注册了三个BAR，并提供了若干BAR的读写回调函数框架，只需要按照功能逐个完成。
+实验提供的代码已经将设备注册、初始化等代码完成，向设备注册了三个 BAR，并提供了若干 BAR 的读写回调函数框架，只需要按照功能逐个完成。
 
 | BAR | 大小 | 用途 |
 |---|---|---|
@@ -502,7 +502,7 @@ GPGPU实验的基础部分的目标是在QEMU中实现一个简单的GPGPU设备
 | BAR2 | 64 MB | 显存（VRAM），存放内核代码与数据 |
 | BAR4 | 64 KB | 门铃寄存器（预留） |
 
-由于BAR0的控制寄存器繁多，在`gpgpu_ctrl_write/read`中进行派发，由单独的函数处理各个不同的功能。
+由于 BAR0 的控制寄存器繁多，在`gpgpu_ctrl_write/read`中进行派发，由单独的函数处理各个不同的功能。
 
 | 回调组 | 偏移范围 | 职责 |
 |---|---|---|
@@ -518,11 +518,11 @@ GPGPU实验的基础部分的目标是在QEMU中实现一个简单的GPGPU设备
 
 - **全局控制寄存器**的 RESET 位写入时触发软复位：清空所有 SIMT 上下文寄存器（thread_id、block_id 等归零），复位完成后自动清除 RESET 位。ENABLE 位控制设备上电，写入后状态置 READY。
 
-#### GPU内核模拟
+#### GPU 内核模拟
 
 ##### 执行模型
 
-执行模型借鉴CUDA的三级线程层次：
+执行模型借鉴 CUDA 的三级线程层次：
 ```
 Grid
 ├── Block(0,0)                Block(0,1)
@@ -539,7 +539,7 @@ Grid
 - **Warp**: 固定 32 Lane，是硬件调度和执行的基本单元
 - **Lane**: 单个线程，拥有独立的寄存器文件（32 个 GPR + 32 个 FPR）
 
-##### NEMU风格的指令解释器
+##### NEMU 风格的指令解释器
 
 全套解码/执行框架复用 NEMU 的设计模式，由三部分组成：
 
@@ -557,7 +557,7 @@ Grid
 
 每条指令对应一个 `def_EHelper(name)` 函数，通过 `Decode` 中的操作数指针直接读写寄存器。浮点指令在执行前调用 `set_rm()` 从指令的 `rm` 位段设置 softfloat 舍入模式，执行后调用 `FP_POSTOP` 将 softfloat 异常标志同步回 Lane 的 `fcsr`。
 
-##### SIMT执行循环
+##### SIMT 执行循环
 
 `gpgpu_core_exec_warp` 是主循环：
 
@@ -597,7 +597,7 @@ Grid
 
 E2M1 因 softfloat 无原生支持，自实现了一个基于 8 值查找表加中点舍入的转换函数 `float32_to_float4_e2m1`。其他格式的转换借助 softfloat 的 `bfloat16` 和 `float8` 系列函数，通过 `bfloat16_to_float32` 作为中间桥接完成 LP -> F32 的扩展。
 
-> 碎碎念：一开始被AI误导softfloat没有支持低精度，越写越复杂，后面突然意识到自己在造轮子，又仔细检查后发现只需要实现e2m1的处理。。。
+> 碎碎念：一开始被 AI 误导 softfloat 没有支持低精度，越写越复杂，后面突然意识到自己在造轮子，又仔细检查后发现只需要实现 e2m1 的处理。。。
 
 ##### 访存与线程上下文
 
@@ -608,4 +608,4 @@ TODO
 
 ## 总结
 
-通过完成CPU和GPU实验，在阅读QEMU源码的过程中，我对于QEMU本身的理解更加深入。在实现GPU内核的过程中，对于GPU的计算模型有了更细致的理解。
+通过完成 CPU 和 GPU 实验，在阅读 QEMU 源码的过程中，我对于 QEMU 本身的理解更加深入。在实现 GPU 内核的过程中，对于 GPU 的计算模型有了更细致的理解。
