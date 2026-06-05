@@ -8,17 +8,17 @@
 
 ## 背景介绍
 
-计算机科学与技术专业，参加过操作系统训练营，常使用qemu，希望这次训练营能对qemu的使用和结构有更深入的了解和掌握。
+计算机科学与技术专业，参加过操作系统训练营，常使用 qemu，希望这次训练营能对 qemu 的使用和结构有更深入的了解和掌握。
 
 ## 专业阶段
 
-选择的方向是CPU建模（TCG）
+选择的方向是 CPU 建模（TCG）
 
 ### QEMU 怎么跑一条指令？
 
 QEMU 的核心是 **动态二进制翻译**：将 Guest 指令（RISC-V）实时翻译成 Host 指令（x86/ARM）并执行。这个翻译引擎叫 **TCG（Tiny Code Generator）**。
 
-使用llm去对qemu翻译的流程进行追踪，整个调用链如下：
+使用 llm 去对 qemu 翻译的流程进行追踪，整个调用链如下：
 
 ```
 cpu_exec_loop()              ← 主循环，不断取指执行
@@ -76,7 +76,7 @@ RISC-V 指令字 (32-bit)
 
 在对整个翻译流程的疏通后，对指令的扩展就涉及到以下几个步骤：
 
-1、在Xg233ai.decode中编写指令的格式
+1、在 Xg233ai.decode 中编写指令的格式
 
 ```
 xg233ai_vrelu     1010110  ..... ..... 110 ..... 1111011 @r
@@ -84,7 +84,7 @@ xg233ai_vrelu     1010110  ..... ..... 110 ..... 1111011 @r
 
 `decodetree` 工具在编译时会处理这个文件，生成 `decode-Xg233ai.c.inc`（解码器）和 `trans_xg233ai_vrelu()` 的函数声明。
 
-2、在insn_trans/trans_xg233ai.c.inc中编写翻译函数
+2、在 insn_trans/trans_xg233ai.c.inc 中编写翻译函数
 
 ```c
 #define GEN_XG233AI_HELPER3(name) \
@@ -105,13 +105,13 @@ GEN_XG233AI_HELPER3(vrelu)
 2. 同理读出 rs1、rs2
 3. `gen_helper_xg233ai_vrelu(tcg_env, dest, src1, src2)` — 生成一行 TCG IR，表示"调用 helper，传入这 4 个参数"
 
-3、在helper.h中声明helper函数签名
+3、在 helper.h 中声明 helper 函数签名
 
 ```c
 DEF_HELPER_4(xg233ai_vrelu, void, env, tl, tl, tl)
 ```
 
-4、在xg233ai_helper.c中实现helper函数
+4、在 xg233ai_helper.c 中实现 helper 函数
 
 ```c
 
@@ -140,7 +140,7 @@ void HELPER(xg233ai_vrelu)(CPURISCVState *env,
 
 1、一种是直接写入内存，无需返回。内存->内存
 
-2、一种是需要返回结果的，寄存器要需要接收Helper的返回值，写回 gpr 。比如vadot、vmax两条指令
+2、一种是需要返回结果的，寄存器要需要接收 Helper 的返回值，写回 gpr。比如 vadot、vmax 两条指令
 
 注：常见的内存访问函数：
 
@@ -151,7 +151,7 @@ void HELPER(xg233ai_vrelu)(CPURISCVState *env,
 | `cpu_ldub_data(env, addr)` | 读 8-bit unsigned |
 | `cpu_stb_data(env, addr, val)` | 写 8-bit |
 
-5、在cpu_cfg_fields.h.inc和cpu_cfg.h中添加扩展字段
+5、在 cpu_cfg_fields.h.inc 和 cpu_cfg.h 中添加扩展字段
 
 ```c
 BOOL_FIELD(ext_Xg233ai)   // 给 CPUState 结构体加一个 bool 成员
@@ -161,13 +161,13 @@ BOOL_FIELD(ext_Xg233ai)   // 给 CPUState 结构体加一个 bool 成员
 MATERIALISE_EXT_PREDICATE(Xg233ai)  // 展开出 has_Xg233ai_p() 函数
 ```
 
-6、在cpu.c中注册ISA扩展和CPU profile
+6、在 cpu.c 中注册 ISA 扩展和 CPU profile
 
 ```c
 MATERIALISE_EXT_PREDICATE(Xg233ai)  // 展开出 has_Xg233ai_p() 函数
 ```
 
-7、在translate.c中引入decode文件和加入解码器表
+7、在 translate.c 中引入 decode 文件和加入解码器表
 
 ```c
 #include "insn_trans/trans_xg233ai.c.inc"
@@ -282,7 +282,7 @@ return
 
 ### 内联 TCG 实现方案
 
-对于固定长度向量（16个），可以直接展开。
+对于固定长度向量（16 个），可以直接展开。
 
 ## vadd 示例
 
@@ -388,4 +388,4 @@ Helper 更优
 
 ## 总结
 
-在CPU实验中，系统地了解了 QEMU TCG 的整体架构和指令执行流程，从最初只会使用 QEMU 运行操作系统，到能够追踪一条 Guest 指令从解码、翻译到执行的完整路径。在大模型的辅助下，原本因该花费大量时间看源码，了解系统结构的过程得到了很大的简化。可以迅速的通过llm来追踪指令在qemu中的完成整条路径，为自己的理解提供了很大的帮助。理清了整条链路，实验测题就成了一个填空题，轻松了很多。整体来说收获满满。
+在 CPU 实验中，系统地了解了 QEMU TCG 的整体架构和指令执行流程，从最初只会使用 QEMU 运行操作系统，到能够追踪一条 Guest 指令从解码、翻译到执行的完整路径。在大模型的辅助下，原本因该花费大量时间看源码，了解系统结构的过程得到了很大的简化。可以迅速的通过 llm 来追踪指令在 qemu 中的完成整条路径，为自己的理解提供了很大的帮助。理清了整条链路，实验测题就成了一个填空题，轻松了很多。整体来说收获满满。
